@@ -15,6 +15,8 @@ import javax.websocket.OnOpen;
 import javax.websocket.Session;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,13 +25,14 @@ import java.util.concurrent.CopyOnWriteArraySet;
 /**
  * webSocketServer服务
  * <p>
- *  //TODO
- *  WebSocketServerService.java
+ * //TODO
+ * WebSocketServerService.java
  * </p>
- * @version v1.0.0
+ *
  * @author 佐斯特勒
+ * @version v1.0.0
  * @date 2020/6/29 21:03
- * @see  WebSocketServerService
+ * @see WebSocketServerService
  **/
 @EqualsAndHashCode
 @Service
@@ -59,25 +62,26 @@ public class WebSocketServerService {
 
     /**
      * 建立会话
-     * @param session 会话
+     *
+     * @param session  会话
      * @param nickName 昵称
      */
     @OnOpen
-    public void onOpen(Session session, @PathParam("nickName")String nickName){
+    public void onOpen(Session session, @PathParam("nickName") String nickName) {
         var msg = new JSONObject();
-       this.session = session;
-       this.nickName = nickName;
+        this.session = session;
+        this.nickName = nickName;
         map.put(session.getId(), session);
         webSocketSet.add(this);
-        log.info("{}加入连接，当前在线有{}人",nickName,webSocketSet.size());
+        log.info("{}加入连接，当前在线有{}人", nickName, webSocketSet.size());
         //消息类型，0-连接成功，1-用户消息
-        msg.put("type",0);
+        msg.put("type", 0);
         //在线人数
-        msg.put("people",webSocketSet.size());
+        msg.put("people", webSocketSet.size());
         //昵称
-        msg.put("name",nickName);
+        msg.put("name", nickName);
         //频道号
-        msg.put("aisle",session.getId());
+        msg.put("aisle", session.getId());
         this.session.getAsyncRemote().sendText(msg.toJSONString());
     }
 
@@ -88,33 +92,41 @@ public class WebSocketServerService {
     public void onClose() {
         //从set中删除
         webSocketSet.remove(this);
-        log.info("{}退出聊天室，剩余{}人",nickName,webSocketSet.size());
+        log.info("{}退出聊天室，剩余{}人", nickName, webSocketSet.size());
     }
 
     @OnMessage
-    public void OnMessage(Session session,@PathParam("nickName") String nickName,String msg){
-        var jsonObject = new JSONObject();
+    public void OnMessage(Session session, @PathParam("nickName") String nickName, String msg) {
         Message message;
-        message = JSON.parseObject(msg,Message.class);
-        if (message.getType() == 1){
+        message = JSON.parseObject(msg, Message.class);
+        if (message.getType() == 1) {
             // 私聊
-            message.setToUser(session.getId());
-            var fromUser = map.get(message.getFromUser());
+            var fromUser = map.get(this.session.getId());
             var toUser = map.get(message.getToUser());
             var user = Optional.ofNullable(toUser);
-            user.ifPresentOrElse(u->{
-                var map = new ConcurrentHashMap<String, Object>(16);
-                map.put("type",1);
-                map.put("name",nickName);
-                map.put("msg",message.getMsg());
-                fromUser.getAsyncRemote().sendText(JSON.toJSONString(map));
-                u.getAsyncRemote().sendText(JSON.toJSONString(map));
-            },()->{
+            user.ifPresentOrElse(u -> {
+                var map = new HashMap<String, Object>(16);
+                map.put("type", 1);
+                map.put("name", nickName);
+                map.put("msg", message.getMsg());
+                var m = JSON.toJSONString(map);
+                try {
+                    fromUser.getAsyncRemote().sendText(m);
+                    u.getBasicRemote().sendText(m);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                log.info(JSON.toJSONString(map));
+            }, () -> {
                 fromUser.getAsyncRemote().sendText("系统消息：对方未在线");
             });
-        }else {
+        } else {
+            var bm = new JSONObject();
+            bm.put("type", 1);
+            bm.put("name", nickName);
+            bm.put("msg", message.getMsg());
             //群发消息
-            broadcast(nickName + ": " + message.getMsg());
+            broadcast(bm.toJSONString());
         }
     }
 
@@ -123,7 +135,7 @@ public class WebSocketServerService {
      */
     @OnError
     public void onError(Session session, Throwable error) {
-        log.error("发生错误,用户：{}，发生错误",session.getId());
+        log.error("发生错误,用户：{}，发生错误", session.getId());
         error.printStackTrace();
     }
 
@@ -131,6 +143,6 @@ public class WebSocketServerService {
      * 群发自定义消息
      */
     public void broadcast(String message) {
-        webSocketSet.forEach(item->item.session.getAsyncRemote().sendText(message));
+        webSocketSet.forEach(item -> item.session.getAsyncRemote().sendText(message));
     }
 }
