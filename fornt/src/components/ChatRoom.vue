@@ -89,9 +89,7 @@
                     //接收到消息的回调方法
                     let that = this;
                     this.webSocket.onmessage = function (event) {
-                        console.log(event.data)
                         let user = eval("(" + event.data + ")")
-                        console.log(user)
                         if (user.type === 0) {
                             // 提示连接成功
                             that.showInfo(user.people, user.aisle);
@@ -101,6 +99,10 @@
                             console.log("接受消息");
                             that.messageList.push(user);
                         }
+                    };
+                    //监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。
+                    window.onbeforeunload = function() {
+                        this.webSocket.close();
                     };
                 }
             },

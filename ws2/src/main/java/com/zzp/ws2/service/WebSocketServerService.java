@@ -61,6 +61,11 @@ public class WebSocketServerService {
     private static Map<String, Session> map = new ConcurrentHashMap<>();
 
     /**
+     * 记录用户 session_id:nickName
+     */
+    private static Map<String,String> peoples = new ConcurrentHashMap<>();
+
+    /**
      * 建立会话
      *
      * @param session  会话
@@ -71,13 +76,15 @@ public class WebSocketServerService {
         var msg = new JSONObject();
         this.session = session;
         this.nickName = nickName;
+        peoples.put(session.getId(), nickName);
         map.put(session.getId(), session);
         webSocketSet.add(this);
         log.info("{}加入连接，当前在线有{}人", nickName, webSocketSet.size());
         //消息类型，0-连接成功，1-用户消息
         msg.put("type", 0);
         //在线人数
-        msg.put("people", webSocketSet.size());
+        msg.put("people_num", webSocketSet.size());
+        msg.put("people", peoples);
         //昵称
         msg.put("name", nickName);
         //频道号
@@ -89,7 +96,8 @@ public class WebSocketServerService {
      * 关闭连接
      */
     @OnClose
-    public void onClose() {
+    public void onClose() throws IOException {
+        peoples.remove(this.session.getId());
         //从set中删除
         webSocketSet.remove(this);
         log.info("{}退出聊天室，剩余{}人", nickName, webSocketSet.size());
@@ -101,7 +109,7 @@ public class WebSocketServerService {
         message = JSON.parseObject(msg, Message.class);
         if (message.getType() == 1) {
             // 私聊
-            var fromUser = map.get(this.session.getId());
+            var fromUser = map.get(session.getId());
             var toUser = map.get(message.getToUser());
             var user = Optional.ofNullable(toUser);
             user.ifPresentOrElse(u -> {
@@ -117,9 +125,7 @@ public class WebSocketServerService {
                     e.printStackTrace();
                 }
                 log.info(JSON.toJSONString(map));
-            }, () -> {
-                fromUser.getAsyncRemote().sendText("系统消息：对方未在线");
-            });
+            }, () -> fromUser.getAsyncRemote().sendText("系统消息：对方未在线"));
         } else {
             var bm = new JSONObject();
             bm.put("type", 1);
