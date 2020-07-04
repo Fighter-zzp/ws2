@@ -56,7 +56,7 @@ public class WebSocketServerService {
 
     /**
      * 与某个客户端的连接会话，需要通过它来给客户端发送数据
-     * 用来记录sessionId和该session进行绑定
+     * 用来记录用户名和该session进行绑定
      */
     private static Map<String, Session> map = new ConcurrentHashMap<>();
 
@@ -89,7 +89,7 @@ public class WebSocketServerService {
         msg.put("name", nickName);
         //频道号
         msg.put("aisle", session.getId());
-        this.session.getAsyncRemote().sendText(msg.toJSONString());
+        broadcast(msg.toJSONString());
     }
 
     /**
@@ -98,6 +98,14 @@ public class WebSocketServerService {
     @OnClose
     public void onClose() throws IOException {
         peoples.remove(this.session.getId());
+        var msg = new JSONObject();
+        msg.put("type", 2);
+        //在线人数
+        msg.put("people_num", webSocketSet.size()-1);
+        msg.put("people", peoples);
+        //昵称
+        msg.put("name", nickName);
+        broadcast(msg.toJSONString());
         //从set中删除
         webSocketSet.remove(this);
         log.info("{}退出聊天室，剩余{}人", nickName, webSocketSet.size());
@@ -149,6 +157,14 @@ public class WebSocketServerService {
      * 群发自定义消息
      */
     public void broadcast(String message) {
-        webSocketSet.forEach(item -> item.session.getAsyncRemote().sendText(message));
+        webSocketSet.forEach(item -> {
+            try {
+                if (item.session.isOpen()){
+                    item.session.getBasicRemote().sendText(message);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
     }
 }

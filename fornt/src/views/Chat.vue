@@ -6,7 +6,7 @@
                     <span>在线群友({{people_num}})</span>
                 </div>
                 <div v-for="(v,i) in people" :key="i" class="text item">
-                    {{v}}
+                    {{v}}-{{i}}
                     <el-divider/>
                 </div>
             </el-card>
@@ -96,31 +96,43 @@
                         message: h('i', {style: 'color: red'}, 'webSocket连接失败')
                     });
                 }
+
                 //接收到消息的回调方法
                 let that = this;
                 this.webSocket.onmessage = function (event) {
                     let user = eval("(" + event.data + ")")
+                    console.log("用户消息：" + event.data)
                     if (user.type === 0) {
                         // 提示连接成功
-                        that.showInfo(user.people_num,user.aisle,user.people);
+                        that.showInfo(user.people_num, user.aisle, user.people);
                     }
                     if (user.type === 1) {
-                        //显示消息
+                        //接受消息
                         console.log("接受消息");
                         that.messageList.push(user);
                     }
+                    if (user.type === 2) {
+                        //显示消息
+                        console.log(user.name + "退出直播间")
+                        that.showInfo(user.people_num, "", user.people);
+                    }
                 };
+
+                this.webSocket.onclose = function (event) {
+                    console.log("关闭：" + event)
+                    that.webSocket.close()
+                }
             }
         },
         methods: {
             load() {
                 this.count = 10
             },
-            siLiao(msg){
+            siLiao(msg) {
                 let n = msg.indexOf("@")
-                if (n !== -1){
-                   return  msg.substring(n+1)
-                }else {
+                if (n !== -1) {
+                    return msg.substring(n + 1)
+                } else {
                     return ""
                 }
             },
@@ -140,10 +152,12 @@
                 this.messageValue = ''
             },
             // 详细连接信息
-            showInfo: function (people_num,aisle,people) {
+            showInfo: function (people_num, aisle, people) {
                 this.people_num = people_num
-                this.aisle = aisle
                 this.people = people
+                if (aisle && aisle !==""){
+                    this.aisle = aisle
+                }
             }
         },
     }
@@ -156,7 +170,7 @@
         line-height: 60px;
     }
 
-    html, body{
+    html, body {
         /*设置内部填充为0，几个布局元素之间没有间距*/
         padding: 0px;
         /*外部间距也是如此设置*/
