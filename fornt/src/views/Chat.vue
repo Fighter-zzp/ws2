@@ -6,7 +6,8 @@
                     <span>在线群友({{people_num}})</span>
                 </div>
                 <div v-for="(v,i) in people" :key="i" class="text item">
-                    {{v}}-{{i}}
+                    <el-button  v-if="v!==nickName" type="text" @click="privateChat(i)">{{v}}-{{i}}</el-button>
+                    <span  v-else type="text" style="color: #909399">{{v}}-{{i}}</span>
                     <el-divider/>
                 </div>
             </el-card>
@@ -23,7 +24,8 @@
                     <li class="infinite-list-item" v-for="(value,key,index) in messageList" :key="index">
                         <el-tag v-if="value.name===nickName" type="success" style="float:right">我：{{value.msg}}</el-tag>
                         <br/>
-                        <el-tag v-if="value.name!==nickName" style="float:left">{{value.name}}：{{value.msg}}</el-tag>
+                        <el-tag v-if="value.name!==nickName && value.type!==2" style="float:left">{{value.name}}：{{value.msg}}</el-tag>
+                        <el-tag v-else-if="value.name!==nickName && value.type===2" type="info" >{{value.name}}：退出直播间</el-tag>
                         <br/>
                     </li>
                 </ul>
@@ -59,7 +61,7 @@
                 count: 0,
                 webSocket: null, // WebSocket对象
                 nickName: "zzp",
-                aisle: "11",
+                aisle: "",
                 people_num: "22",
                 people: [],
                 messageList: [], // 消息列表
@@ -101,20 +103,21 @@
                 let that = this;
                 this.webSocket.onmessage = function (event) {
                     let user = eval("(" + event.data + ")")
-                    console.log("用户消息：" + event.data)
+                    // console.log("用户消息：" + event.data)
                     if (user.type === 0) {
                         // 提示连接成功
                         that.showInfo(user.people_num, user.aisle, user.people);
                     }
                     if (user.type === 1) {
                         //接受消息
-                        console.log("接受消息");
+                        // console.log("接受消息");
                         that.messageList.push(user);
                     }
                     if (user.type === 2) {
                         //显示消息
-                        console.log(user.name + "退出直播间")
+                        // console.log(user.name + "退出直播间")
                         that.showInfo(user.people_num, "", user.people);
+                        that.messageList.push(user);
                     }
                 };
 
@@ -128,7 +131,7 @@
             load() {
                 this.count = 10
             },
-            siLiao(msg) {
+            charOpt(msg) {
                 let n = msg.indexOf("@")
                 if (n !== -1) {
                     return msg.substring(n + 1)
@@ -136,9 +139,12 @@
                     return ""
                 }
             },
+            privateChat(aisle){
+                this.messageValue += " @"+aisle
+            },
             // 发送消息
             sendMessage: function () {
-                let aisle = this.siLiao(this.messageValue)
+                let aisle = this.charOpt(this.messageValue)
                 let socketMsg = {msg: this.messageValue, toUser: aisle};
                 if (aisle === "") {
                     //群聊.
@@ -147,7 +153,7 @@
                     //单聊.
                     socketMsg.type = 1;
                 }
-                console.log(JSON.stringify(socketMsg))
+                // console.log(JSON.stringify(socketMsg))
                 this.webSocket.send(JSON.stringify(socketMsg));
                 this.messageValue = ''
             },
@@ -156,7 +162,9 @@
                 this.people_num = people_num
                 this.people = people
                 if (aisle && aisle !==""){
-                    this.aisle = aisle
+                    if (!this.aisle && this.aisle === ''){
+                        this.aisle = aisle
+                    }
                 }
             }
         },

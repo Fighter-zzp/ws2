@@ -115,25 +115,30 @@ public class WebSocketServerService {
     public void OnMessage(Session session, @PathParam("nickName") String nickName, String msg) {
         Message message;
         message = JSON.parseObject(msg, Message.class);
+        var sendMsg = new HashMap<String, Object>(16);
         if (message.getType() == 1) {
             // 私聊
             var fromUser = map.get(session.getId());
             var toUser = map.get(message.getToUser());
             var user = Optional.ofNullable(toUser);
             user.ifPresentOrElse(u -> {
-                var map = new HashMap<String, Object>(16);
-                map.put("type", 1);
-                map.put("name", nickName);
-                map.put("msg", message.getMsg());
-                var m = JSON.toJSONString(map);
+                sendMsg.put("type", 1);
+                sendMsg.put("name", nickName);
+                sendMsg.put("msg", message.getMsg());
+                var m = JSON.toJSONString(sendMsg);
                 try {
                     fromUser.getAsyncRemote().sendText(m);
                     u.getBasicRemote().sendText(m);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                log.info(JSON.toJSONString(map));
-            }, () -> fromUser.getAsyncRemote().sendText("系统消息：对方未在线"));
+//                log.info(JSON.toJSONString(msg));
+            }, () -> {
+                sendMsg.put("type", 1);
+                sendMsg.put("name", nickName);
+                sendMsg.put("msg", "-*** 系统消息：对方未在线! ***-");
+                fromUser.getAsyncRemote().sendText(JSON.toJSONString(sendMsg));
+            });
         } else {
             var bm = new JSONObject();
             bm.put("type", 1);
